@@ -4,6 +4,13 @@ from pathlib import Path
 import pkg_resources
 import yaml
 
+from dotenv import dotenv_values
+
+try:
+    local_config = dotenv_values(".env")
+except FileNotFoundError:
+    local_config = dict()
+
 
 def get_config(config_path: Path = None) -> 'Config':
     if config_path is None:
