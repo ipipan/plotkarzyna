@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "python-template"
+name = "plotkarzyna"
 version = "0.1.0"
 description = ""
 authors = ["Karol Saputa <karol.saputa@gmail.com>"]
 readme = "README.md"
-packages = [{include = "python_template"}]
+packages = [{include = "plotkarzyna"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

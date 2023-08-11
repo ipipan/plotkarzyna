@@ -15,7 +15,7 @@ except FileNotFoundError:
 def get_config(config_path: Path = None) -> 'Config':
     if config_path is None:
         config_path = pkg_resources.resource_filename(
-            'python_template',
+            'plotkarzyna',
             'config.yaml'
         )
     elif config_path.exists():
