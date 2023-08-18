@@ -135,17 +135,20 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
+batch_size = 32
 training_args = TrainingArguments(
-    output_dir=Path(local_config['MODEL_DIR']) / 'herbert-large',
+    output_dir=Path(local_config['MODEL_DIR']) / 'herbert-large-2',
     learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=20,
+    per_device_train_batch_size=batch_size,
+    per_device_eval_batch_size=batch_size,
+    num_train_epochs=60,
     weight_decay=0.01,
     evaluation_strategy="epoch",
     save_strategy="epoch",
     load_best_model_at_end=True,
 )
+
+
 
 trainer = Trainer(
     model=model,
@@ -165,7 +168,7 @@ for ind, sample in enumerate(train_ds):
 
 dl = DataLoader(
     train_ds,
-    batch_size=16,
+    batch_size=batch_size,
     shuffle=True,
     collate_fn=data_collator,
     )
