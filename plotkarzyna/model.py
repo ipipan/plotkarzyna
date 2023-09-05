@@ -1,5 +1,6 @@
 
 
+import spacy_alignments
 from transformers import AutoModel, AutoTokenizer, AutoModelForTokenClassification
 import nltk
 from nltk.tokenize import sent_tokenize
@@ -25,88 +26,119 @@ def get_model(checkpoint_path):
         )
     return tokenizer, model
 
-def chunkize(text, tokenizer):
-    sentences = sent_tokenize(' '.join(text), language='polish')
+
+def split_and_tokenize(text: str, tokenizer: AutoTokenizer) -> dict:
+    """
+    Splits the input text into smaller chunks fitting within the tokenizer's max_len 
+    and returns the tokenized form of each chunk as a batch. Attempts to split by sentences.
+    
+    Args:
+    - text (str): The input text to split and tokenize.
+    - tokenizer (AutoTokenizer): The tokenizer used for tokenization.
+
+    Returns:
+    - dict: A dictionary containing the tokenized inputs (input_ids, attention_mask, etc.)
+    """
+    
+    max_len = tokenizer.model_max_length - 2  # account for [CLS] and [SEP] tokens
+    
+    # Split text into sentences
+    sentences = sent_tokenize(text)
+    
     chunks = []
-    current_chunk = []
-    current_length = 0
-    max_len = tokenizer.model_max_length - 2
+    current_chunk = ""
+    
     for sentence in sentences:
-        # print(sentence)
-        sentence_tokens = tokenizer.tokenize(sentence, padding=False, is_split_into_words=False, add_special_tokens=False)
-        input_ids = tokenizer.convert_tokens_to_ids(sentence_tokens)
-        if current_length + len(sentence_tokens) <= max_len:
-            current_chunk.extend(sentence_tokens)
-            current_length += len(sentence_tokens)
+        # Check the length with current chunk + new sentence
+        total_length = len(tokenizer.encode(current_chunk + sentence, add_special_tokens=True))
+        
+        # If the sentence with the current chunk is too long
+        if total_length > max_len:
+            # If even the sentence alone is too long
+            if len(tokenizer.encode(sentence, add_special_tokens=True)) > max_len:
+                # Split the sentence into words and add them until max_len
+                words = sentence.split()
+                temp_sentence = ""
+                for word in words:
+                    if len(tokenizer.encode(temp_sentence + " " + word, add_special_tokens=True)) <= max_len:
+                        temp_sentence += " " + word
+                    else:
+                        chunks.append(temp_sentence)
+                        temp_sentence = word
+                chunks.append(temp_sentence)
+            else:
+                chunks.append(current_chunk)
+                current_chunk = sentence
         else:
-            chunks.append(current_chunk)
-            current_chunk = sentence_tokens
-            current_length = len(sentence_tokens)
-    if current_chunk:  # Add any remaining tokens as a chunk
+            current_chunk += " " + sentence
+
+    # Add any remaining text in the current chunk
+    if current_chunk:
         chunks.append(current_chunk)
-    print([len(sent) for sent in sentences], [len(chunk) for chunk in chunks])
-    return chunks
 
-def predict(text, model, tokenizer, verbose=False):
+    # Convert each chunk into model inputs
+    encoding = tokenizer.batch_encode_plus(chunks, padding='longest', return_tensors='pt', return_offsets_mapping=True)
+
+    return encoding
+
+
+def predict(text: str | list[str], model: AutoModel, tokenizer: AutoTokenizer, verbose: bool = False):
     if isinstance(text, list):
-        is_split_into_words = True
-    else:
-        is_split_into_words = False
+        segments = text
+        text = ' '.join(segments)
+    elif isinstance(text, str):
+        segments = text.split(' ')
 
-    chunks = chunkize(text, tokenizer)
-    print(f"chunks: {chunks}")
-    print([len(chunk) for chunk in chunks])
-    tokenized = tokenizer.batch_encode_plus(chunks, return_tensors='pt', is_split_into_words=True)
-    print(tokenized.input_ids.shape, tokenized.attention_mask.shape)
-    print(tokenized)
+    tokenized = split_and_tokenize(text, tokenizer)
     pred = model(
-    **tokenized
+    input_ids = tokenized.input_ids,
+    attention_mask=tokenized.attention_mask,
     ).logits.argmax(-1)
 
     if verbose:
         print(' '.join([
-            f"|{tokenizer.decode(tok, clean_up_tokenization_spaces=False)}| ({id2label[int(el)]})" for el, tok in zip(pred, list(tokenized['input_ids'][0]))
+            f"|{tokenizer.decode(tok, clean_up_tokenization_spaces=False)}| ({id2label[int(el)]})" 
+            for el, tok in zip(pred, list(tokenized.input_ids[0]))
         ]))
+
     tokens = []
     labels = []
     spans_inds = []
-
-    for ind, text in enumerate(chunks):
-        tokens.extend([tokenizer.decode(tok) for tok in list(tokenized['input_ids'][ind])])
-        labels.extend([id2label[int(el)] for el, tok in zip(pred[ind], list(tokenized['input_ids'][ind]))])
+    for ind in range(tokenized.input_ids.shape[0]):
+        tokens.extend([tokenizer.decode(tok) for tok in list(tokenized.input_ids[ind])])
+        labels.extend([id2label[int(el)] for el, tok in zip(pred[ind], list(tokenized.input_ids[ind]))])
         spans_inds.extend(decode_bioes(labels, tokens))
-    return tokens, labels, spans_inds
+        
+    mention_inds = [
+        (span[0], (span[-1])) for span in spans_inds
+        ]
+
+    aligned_span_inds = align(segments, tokens, mention_inds)
+    spans = [segments[span[0]:(span[-1])] for span in aligned_span_inds]
+    
+    return tokens, labels, aligned_span_inds, spans
 
 
-# def predict(text, model, tokenizer, verbose=False):
-#     if isinstance(text, list):
-#         is_split_into_words = True
-#     else:
-#         is_split_into_words = False
+def align_mention(mention_inds, subtoken2token_indices):
+    start, end = mention_inds
+    if subtoken2token_indices[start] and subtoken2token_indices[end]:
+        start, end = (
+            subtoken2token_indices[start][0],
+            subtoken2token_indices[end][0]
+        )
 
-#     if hasattr(tokenizer, 'model_max_length') and tokenizer.model_max_length and is_split_into_words:
-#         max_len = tokenizer.model_max_length - 2
-#         texts = [text[start:(start+max_len)] for start in range(0, len(text) + max_len, max_len)]
-#     else:
-#         texts = [text]
-#     texts = list(filter(lambda t: t, texts))
-#     print([len(text) for text in texts])
+        return start, (end + 1)
+    else:
+        return None
 
-#     tokenized = tokenizer(texts, return_tensors='pt', is_split_into_words=is_split_into_words)
-#     pred = model(
-#     **tokenized
-#     ).logits.argmax(-1)
+def align(segments, tokens, mentions_inds):
+    a2b, b2a = spacy_alignments.get_alignments(tokens, segments)
+    # for ind, token in enumerate(tokens):
+    #     print(token, a2b[ind], [segments[el] for el in a2b[ind]])
+    aligned_mention_inds = []
+    for mention_inds in mentions_inds:
+        aligned = align_mention(mention_inds, a2b)
+        if aligned:
+            aligned_mention_inds.append(aligned)
 
-#     if verbose:
-#         print(' '.join([
-#             f"|{tokenizer.decode(tok, clean_up_tokenization_spaces=False)}| ({id2label[int(el)]})" for el, tok in zip(pred, list(tokenized['input_ids'][0]))
-#         ]))
-#     tokens = []
-#     labels = []
-#     spans_inds = []
-
-#     for ind, text in enumerate(texts):
-#         tokens.extend([tokenizer.decode(tok) for tok in list(tokenized['input_ids'][ind])])
-#         labels.extend([id2label[int(el)] for el, tok in zip(pred[ind], list(tokenized['input_ids'][ind]))])
-#         spans_inds.extend(decode_bioes(labels, tokens))
-#     return tokens, labels, spans_inds
+    return aligned_mention_inds

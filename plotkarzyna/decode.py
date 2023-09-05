@@ -28,8 +28,8 @@ def decode_bioes(labels, tokens):
             else:
                 continue
         else:
-            # for curr_span in curr_spans:
-            #     curr_span.append(ind)
+            for curr_span in curr_spans:
+                curr_span.append(ind)
 
             if token_label in ['B', 'S']:
                 if curr_spans_types and curr_spans_types[-1] == 'S':
