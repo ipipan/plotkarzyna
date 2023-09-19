@@ -19,7 +19,7 @@ except FileNotFoundError:
 load_dotenv()
 
 
-def predict(model_path, input_dir, n_samples=None):
+def predict_dir(model_path, input_dir, n_samples=None):
     paths = list((input_dir).iterdir())
     if n_samples:
         paths = paths[:n_samples]
@@ -55,7 +55,7 @@ def predict(model_path, input_dir, n_samples=None):
                         text=' '.join(segments),
                         segments=segments,
                         span_start=start,
-                        span_end=end,
+                        span_end=end-1,
                         lemmatized_text=None,
                         head_orth=None,
                         head=start + head,
@@ -72,4 +72,4 @@ def predict(model_path, input_dir, n_samples=None):
 if __name__ == '__main__':
     input_dir = Path(local_config['PCC_ROOT']) / 'test'
     checkpoint_path = '/home/ksaputa/mspace/plotkarzyna/models/herbert-large-2/checkpoint-6240'
-    predict(checkpoint_path, input_dir)
+    predict_dir(checkpoint_path, input_dir)
