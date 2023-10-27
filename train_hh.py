@@ -15,6 +15,8 @@ import evaluate
 
 seqeval = evaluate.load("seqeval")
 
+model_name = 'allegro/herbert-large-cased'
+
 try:
     local_config = dotenv_values(".env")
 except FileNotFoundError:
@@ -67,7 +69,7 @@ for m in test_docs:
 
 from transformers import AutoTokenizer
 from plotkarzyna.dataset import MentionDS
-tokenizer = AutoTokenizer.from_pretrained('allegro/herbert-base-cased')
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 train_ds = MentionDS(
     texts,
@@ -100,7 +102,7 @@ label2id = {
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 
 model = AutoModelForTokenClassification.from_pretrained(
-    "allegro/herbert-large-cased", num_labels=5, id2label=id2label, label2id=label2id
+    model_name, num_labels=5, id2label=id2label, label2id=label2id
 )
 
 from transformers import DataCollatorForTokenClassification
@@ -135,9 +137,9 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
-batch_size = 32
+batch_size = 16
 training_args = TrainingArguments(
-    output_dir=Path(local_config['MODEL_DIR']) / 'herbert-large-2',
+    output_dir=Path(local_config['MODEL_DIR']) / model_name,
     learning_rate=2e-5,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,

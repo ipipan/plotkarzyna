@@ -44,14 +44,19 @@ def predict_dir(model_path, input_dir, n_samples=None):
     pred_path.mkdir(exist_ok=True)
     for doc, pred in zip(tei_docs, preds):
         doc.layers['mentions'].remove_mentions()
+        mention_set = set()
         for ind, span in enumerate(pred[-2]):
             start, end = span
+            if span in mention_set:
+                continue
+            else:
+                mention_set.add(span)
             segments = doc.text.segments[start:(end)]
             head = get_head(segments, nlp)
             try:
                 doc.layers['mentions'].add_mention(
                     Mention(
-                        id=f"mention_{ind}",
+                        id=f"mention_{ind+1}",
                         text=' '.join(segments),
                         segments=segments,
                         span_start=start,
@@ -71,5 +76,5 @@ def predict_dir(model_path, input_dir, n_samples=None):
 
 if __name__ == '__main__':
     input_dir = Path(local_config['PCC_ROOT']) / 'test'
-    checkpoint_path = '/home/ksaputa/mspace/plotkarzyna/models/herbert-large-2/checkpoint-6240'
+    checkpoint_path = Path(local_config['PREDICTION_CHECKPOINT_PATH'])
     predict_dir(checkpoint_path, input_dir)

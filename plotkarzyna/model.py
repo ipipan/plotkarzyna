@@ -1,3 +1,4 @@
+import re
 
 import spacy_alignments
 from transformers import AutoModel, AutoTokenizer, AutoModelForTokenClassification
@@ -39,7 +40,7 @@ def split_and_tokenize(text: str, tokenizer: AutoTokenizer) -> dict:
     - dict: A dictionary containing the tokenized inputs (input_ids, attention_mask, etc.)
     """
     
-    max_len = tokenizer.model_max_length - 2  # account for [CLS] and [SEP] tokens
+    max_len = tokenizer.model_max_length - 40  # account for [CLS] and [SEP] tokens
     
     # Split text into sentences
     sentences = sent_tokenize(text)
@@ -86,7 +87,7 @@ def predict(text: str | list[str], model: AutoModel, tokenizer: AutoTokenizer, v
         segments = text
         text = ' '.join(segments)
     elif isinstance(text, str):
-        segments = text.split(' ')
+        segments = re.split(' |\n', text)
 
     tokenized = split_and_tokenize(text, tokenizer)
     pred = model(
@@ -106,13 +107,14 @@ def predict(text: str | list[str], model: AutoModel, tokenizer: AutoTokenizer, v
     for ind in range(tokenized.input_ids.shape[0]):
         tokens.extend([tokenizer.decode(tok) for tok in list(tokenized.input_ids[ind])])
         labels.extend([id2label[int(el)] for el, tok in zip(pred[ind], list(tokenized.input_ids[ind]))])
-        spans_inds.extend(decode_bioes(labels, tokens))
+        
+    spans_inds = decode_bioes(labels, tokens)
         
     mention_inds = [
         (span[0], (span[-1])) for span in spans_inds
         ]
 
-    aligned_span_inds = align(segments, tokens, mention_inds)
+    aligned_span_inds = set(align(segments, tokens, mention_inds)) # @TODO fix: here mention_inds are in respect to split text, instead of the whole text!
     spans = [segments[span[0]:(span[-1])] for span in aligned_span_inds]
     
     return tokens, labels, aligned_span_inds, spans
