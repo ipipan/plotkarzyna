@@ -6,7 +6,7 @@
 ```
 
 from transformers import AutoModel, AutoTokenizer, AutoModelForTokenClassification
-checkpoint_path = Path(local_config['PREDICTION_CHECKPOINT_PATH'])
+checkpoint_path = 'ipipan/plotkarzyna-large'
 model = AutoModelForTokenClassification.from_pretrained(checkpoint_path)
 tokenizer = AutoTokenizer.from_pretrained(checkpoint_path, return_tensors='pt')
 from plotkarzyna.model import predict
