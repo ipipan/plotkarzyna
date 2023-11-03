@@ -1,1 +1,3 @@
-# python-template
+# plotkarzyna
+
+## a baseline for mention detection in Polish
