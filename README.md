@@ -18,3 +18,7 @@ tokens, labels, aligned_span_inds, spans = predict(text, model, tokenizer, verbo
 for span in sorted(spans):
     print(span)
 ```
+
+# Additional Information
+
+This work was supported by the European Regional Development Fund as a part of 2014–2020 Smart Growth Operational Programme, CLARIN — Common Language Resources and Technology Infrastructure, project no. POIR.04.02.00-00C002/19 and by the project co-financed by the Minister of Education and Science under the agreement 2022/WK/09.
